@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Physics + ANN for Cooling Energy · uOttawa</title>
+<meta name="description" content="Slideshow summarizing Li et al. (2024), Combining physical laws and ANN for predicting energy consumption of data center cooling systems, Energy and Buildings 311, 114170.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;0,700;1,500&family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* uOttawa brand palette */
+  :root{
+    --garnet:#8f001a;
+    --garnet-dark:#6b0014;
+    --garnet-tint:#f7e9ec;
+    --charcoal:#2d2d2c;
+    --warm:#80746c;
+    --warm-tint:#f3f0ee;
+    --blue:#636d77;
+    --blue-tint:#eef0f2;
+    --green:#67796c;
+    --green-tint:#eef2ef;
+    --polar:#f2f2f2;
+    --white:#ffffff;
+    --line:#dcdcdc;
+    --muted:#5e5955;
+    --sans:"Work Sans", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    --serif:"Spectral", Georgia, "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#1f1f1e;color:var(--charcoal);font-family:var(--sans);overflow:hidden}
+  body{display:flex;align-items:center;justify-content:center}
+
+  /* 16:9 stage, scaled to fit by JS */
+  #stage{width:1280px;height:720px;position:relative;transform-origin:center center;flex:none;z-index:6;pointer-events:none}
+  #stage a{pointer-events:auto}
+  .slide{position:absolute;inset:0;padding:70px 80px 80px;display:flex;flex-direction:column;background:var(--white);
+    opacity:0;visibility:hidden;transition:opacity .35s ease, visibility .35s;overflow:hidden}
+  .slide.active{opacity:1;visibility:visible}
+  /* garnet rule at top + footer on content slides */
+  .slide:not(.hero)::before{content:"";position:absolute;left:0;top:0;width:100%;height:8px;background:var(--garnet)}
+  .slide:not(.hero)::after{content:"University of Ottawa  ·  Article review";position:absolute;left:80px;bottom:26px;
+    font-size:13px;letter-spacing:.06em;color:var(--warm);font-weight:500}
+  .slide:not(.hero) .pg{position:absolute;right:80px;bottom:24px;font-size:13px;color:var(--warm);font-weight:600}
+
+  .kicker{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--garnet);font-weight:700;margin-bottom:12px}
+  h1{font-family:var(--serif);font-size:56px;line-height:1.08;font-weight:600;letter-spacing:-.01em}
+  h2{font-family:var(--serif);font-size:42px;line-height:1.12;font-weight:600;letter-spacing:-.005em;margin-bottom:30px;color:var(--charcoal)}
+  h3{font-size:21px;font-weight:700;margin-bottom:10px;color:var(--charcoal)}
+  p,li{font-size:21px;line-height:1.5;color:var(--charcoal)}
+  .muted{color:var(--muted)}
+  ul.clean{list-style:none}
+  ul.clean li{position:relative;padding-left:30px;margin:12px 0}
+  ul.clean li::before{content:"";position:absolute;left:4px;top:.55em;width:12px;height:12px;background:var(--garnet)}
+  .accent{color:var(--garnet);font-weight:600}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+  .card{background:var(--polar);border-radius:4px;padding:24px 26px;border-left:6px solid var(--line)}
+  .card p,.card li{font-size:18.5px}
+  .card.phys{border-left-color:var(--blue);background:var(--blue-tint)}
+  .card.ann{border-left-color:var(--warm);background:var(--warm-tint)}
+  .card.mix{border-left-color:var(--garnet);background:var(--garnet-tint)}
+  .tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;margin-bottom:12px;color:#fff}
+  .tag.phys{background:var(--blue)} .tag.ann{background:var(--warm)} .tag.mix{background:var(--garnet)} .tag.plain{background:var(--charcoal)}
+  .pro,.con{font-size:17.5px;line-height:1.45;margin:7px 0;padding-left:24px;position:relative}
+  .pro::before{content:"+";position:absolute;left:2px;color:var(--green);font-weight:800}
+  .con::before{content:"−";position:absolute;left:3px;color:var(--garnet);font-weight:800}
+  .big-stat{font-family:var(--serif);font-size:140px;font-weight:700;line-height:1;color:var(--garnet)}
+  table.cmp{width:100%;border-collapse:collapse;font-size:19px}
+  table.cmp th,table.cmp td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--line)}
+  table.cmp thead th{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--charcoal);font-weight:700}
+  table.cmp thead th.hl{background:var(--garnet)}
+  table.cmp td:first-child{font-weight:600}
+  table.cmp td.hl{background:var(--garnet-tint)}
+  .rate{display:inline-flex;gap:4px;margin-right:10px;vertical-align:middle}
+  .rate i{width:11px;height:11px;border-radius:50%;border:2px solid var(--garnet);display:inline-block}
+  .rate i.f{background:var(--garnet)}
+  .refs li{font-size:15.5px;line-height:1.5;margin:12px 0;color:var(--muted)}
+  .refs a{color:var(--garnet);text-decoration:none;word-break:break-all}
+  .refs strong{color:var(--charcoal);font-weight:600}
+  .callout{border-left:6px solid var(--garnet);padding:8px 0 8px 22px;margin-top:26px}
+  .callout p{font-family:var(--serif);font-size:24px;font-style:italic;font-weight:500}
+
+  /* Hero slides (title + closing): full garnet */
+  .hero{background:var(--garnet);color:#fff;justify-content:center}
+  .hero .kicker{color:#f2c9d1}
+  .hero h1{color:#fff;font-size:62px;max-width:1060px}
+  .hero .rule{width:110px;height:6px;background:#fff;margin:34px 0 0}
+  .hero .cite{margin-top:30px;font-size:20px;color:#f6dfe4;line-height:1.6}
+  .hero .by{position:absolute;left:80px;bottom:56px;font-size:17px;color:#fff;font-weight:500}
+  .hero .by span{color:#f2c9d1}
+  .hero .inst{position:absolute;right:80px;bottom:56px;font-family:var(--serif);font-size:22px;color:#fff;font-weight:600}
+  .hero .band{position:absolute;right:0;top:0;width:260px;height:100%;background:var(--garnet-dark)}
+  .hero .band::after{content:"";position:absolute;left:0;top:0;width:8px;height:100%;background:#fff;opacity:.15}
+  .hero > *:not(.band){position:relative;z-index:1}
+  .hero .by,.hero .inst{position:absolute}
+  .hero p{color:#fff}
+  .hero .grid3 .card{background:rgba(255,255,255,.08);border-left-color:#fff}
+  .hero .grid3 .card p,.hero .grid3 .card h3{color:#fff}
+
+  /* Chrome: progress, counter, notes */
+  #progress{position:fixed;left:0;top:0;height:4px;background:var(--garnet);transition:width .3s ease;z-index:10}
+  #counter{display:none}
+  #hint{position:fixed;left:18px;bottom:10px;font-size:12px;color:#bbb;z-index:10;opacity:.85;transition:opacity .6s}
+  #nav{position:fixed;inset:0;display:flex;z-index:5}
+  #nav div{flex:1;cursor:pointer}
+  #notes{position:fixed;left:0;right:0;bottom:0;max-height:34vh;overflow:auto;background:var(--charcoal);
+    border-top:4px solid var(--garnet);padding:18px 24px 40px;font-size:16px;line-height:1.55;color:#eee;z-index:20;display:none}
+  #notes.show{display:block}
+  #notes b{color:#f2c9d1;display:block;margin-bottom:6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  .notes{display:none}
+
+  @media print{
+    html,body{overflow:visible;height:auto;background:#fff}
+    body{display:block}
+    #stage{transform:none!important;width:auto;height:auto}
+    .slide{position:relative;opacity:1;visibility:visible;width:1280px;height:720px;page-break-after:always;break-after:page;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #progress,#counter,#hint,#nav,#notes{display:none!important}
+    @page{size:1280px 720px;margin:0}
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div id="stage">
+
+  <!-- 1. Title -->
+  <section class="slide hero">
+    <div class="band"></div>
+    <div class="kicker">Article review · Energy and Buildings, 2024</div>
+    <h1>Combining physical laws and ANN to predict data center cooling energy</h1>
+    <div class="rule"></div>
+    <p class="cite">Xuezhi Li, Xinyi Wang, Zhiguang He, Xiaoxuan Chen &amp; Zhen Li<br>
+      <em>Energy and Buildings</em>, 311, Article 114170 · doi.org/10.1016/j.enbuild.2024.114170</p>
+    <div class="by">Presented by <strong>Your Name</strong> <span>·</span> Course code</div>
+    <div class="inst">University of Ottawa</div>
+    <div class="notes">This paper asks a practical question: how can we predict how much electricity a data center's cooling system will use, accurately and in a way engineers can still trust? The authors' answer is to let physics do most of the work and let a neural network fix what physics gets wrong.</div>
+  </section>
+
+  <!-- 2. Why it matters -->
+  <section class="slide">
+    <div class="kicker">Context</div>
+    <h2>Why predict cooling energy?</h2>
+    <div class="grid2" style="align-items:center;gap:60px">
+      <div style="border-left:6px solid var(--garnet);padding-left:30px">
+        <div class="big-stat">~40%</div>
+        <p class="muted" style="margin-top:14px">of a data center's total electricity is commonly estimated to go to cooling — the largest load after the IT equipment itself.</p>
+      </div>
+      <ul class="clean">
+        <li>Every watt of computing becomes a watt of heat that must be removed.</li>
+        <li>Accurate forecasts let operators <span class="accent">optimize setpoints</span>, schedule loads and plan capacity.</li>
+        <li>Predictions also underpin <span class="accent">digital twins, model-predictive control</span> and fault detection.</li>
+        <li>Better prediction → lower PUE, lower cost, lower emissions.</li>
+      </ul>
+    </div>
+    <div class="pg">2</div>
+    <div class="notes">Cooling is the biggest overhead in a data center. If you can predict its energy use well, you can control it well. That is the motivation for the whole paper.</div>
+  </section>
+
+  <!-- 3. The dilemma -->
+  <section class="slide">
+    <div class="kicker">The problem</div>
+    <h2>Two modeling traditions, two weaknesses</h2>
+    <div class="grid2">
+      <div class="card phys">
+        <span class="tag phys">Physics-based · "white box"</span>
+        <h3>Thermodynamics &amp; heat-transfer equations</h3>
+        <p class="pro">Interpretable — every term has a physical meaning</p>
+        <p class="pro">Generalizes to conditions not seen in data</p>
+        <p class="con">Simplifying assumptions miss nonlinear, real-world effects</p>
+        <p class="con">Slow to build and calibrate for each system</p>
+      </div>
+      <div class="card ann">
+        <span class="tag ann">Data-driven · "black box"</span>
+        <h3>Artificial neural network (ANN)</h3>
+        <p class="pro">Learns complex nonlinear relationships directly from data</p>
+        <p class="pro">Fast to evaluate once trained</p>
+        <p class="con">Little interpretability</p>
+        <p class="con">Accuracy limited by the amount and variety of training data; weak outside it</p>
+      </div>
+    </div>
+    <div class="callout"><p>The core challenge: balancing accuracy against interpretability.</p></div>
+    <div class="pg">3</div>
+    <div class="notes">Physics models are trustworthy but approximate. Neural networks are flexible but opaque and only as good as their training data. The paper tries to get the best of both.</div>
+  </section>
+
+  <!-- 4. Test system -->
+  <section class="slide">
+    <div class="kicker">Experimental setup</div>
+    <h2>Test bed: an integrated heat pipe cooling system</h2>
+    <div class="grid2" style="gap:44px">
+      <ul class="clean">
+        <li>Laboratory data center cooled by an <span class="accent">integrated heat pipe cooling (IHPC)</span> system, built on the research group's earlier work.</li>
+        <li>Heat pipes move heat passively when outdoor air is cold (<em>free / natural cooling</em>); vapor-compression refrigeration takes over or assists when it is warm.</li>
+        <li>Measured operating parameters and the system's <span class="accent">metered energy consumption</span> form the dataset.</li>
+      </ul>
+      <div class="card" style="display:flex;flex-direction:column;justify-content:center;border-left-color:var(--charcoal)">
+        <svg viewBox="0 0 460 260" width="100%" role="img" aria-label="Operating modes of the integrated heat pipe system">
+          <defs>
+            <linearGradient id="tg" x1="0" x2="1"><stop offset="0" stop-color="#636d77"/><stop offset="1" stop-color="#8f001a"/></linearGradient>
+          </defs>
+          <text x="230" y="24" fill="#5e5955" font-size="14" text-anchor="middle" font-family="Work Sans, sans-serif" font-weight="600">Outdoor temperature →</text>
+          <rect x="20" y="40" width="420" height="10" fill="url(#tg)"/>
+          <rect x="20" y="80" width="130" height="150" fill="#ffffff" stroke="#636d77" stroke-width="2"/>
+          <rect x="165" y="80" width="130" height="150" fill="#ffffff" stroke="#67796c" stroke-width="2"/>
+          <rect x="310" y="80" width="130" height="150" fill="#8f001a"/>
+          <g font-family="Work Sans, sans-serif" text-anchor="middle">
+            <text x="85" y="122" fill="#636d77" font-size="16" font-weight="700">Heat pipe</text>
+            <text x="85" y="144" fill="#636d77" font-size="16" font-weight="700">only</text>
+            <text x="85" y="182" fill="#2d2d2c" font-size="13">passive, very</text>
+            <text x="85" y="200" fill="#2d2d2c" font-size="13">low power</text>
+            <text x="230" y="122" fill="#67796c" font-size="16" font-weight="700">Integrated</text>
+            <text x="230" y="144" fill="#67796c" font-size="16" font-weight="700">mode</text>
+            <text x="230" y="182" fill="#2d2d2c" font-size="13">heat pipe +</text>
+            <text x="230" y="200" fill="#2d2d2c" font-size="13">compressor</text>
+            <text x="375" y="122" fill="#ffffff" font-size="16" font-weight="700">Mechanical</text>
+            <text x="375" y="144" fill="#ffffff" font-size="16" font-weight="700">cooling</text>
+            <text x="375" y="182" fill="#f6dfe4" font-size="13">vapor</text>
+            <text x="375" y="200" fill="#f6dfe4" font-size="13">compression</text>
+          </g>
+        </svg>
+        <p class="muted" style="font-size:15px;margin-top:10px">Mode switching with weather and load is exactly the kind of nonlinearity a simple physical model struggles to capture.</p>
+      </div>
+    </div>
+    <div class="pg">4</div>
+    <div class="notes">The test system is an integrated heat pipe cooling system in a lab data center. It switches between passive heat-pipe cooling, a combined mode and conventional compressor cooling depending on outdoor temperature. That switching makes energy use highly nonlinear.</div>
+  </section>
+
+  <!-- 5. Three models -->
+  <section class="slide">
+    <div class="kicker">Method</div>
+    <h2>Three models, same data</h2>
+    <div class="grid3">
+      <div class="card phys">
+        <span class="tag phys">Model 1</span>
+        <h3>Physical model</h3>
+        <p>Heat-transfer and energy-consumption equations for the cooling system's components, calibrated to the rig.</p>
+      </div>
+      <div class="card ann">
+        <span class="tag ann">Model 2</span>
+        <h3>Pure ANN</h3>
+        <p>A neural network trained to map operating inputs directly to energy consumption.</p>
+      </div>
+      <div class="card mix">
+        <span class="tag mix">Model 3 · the contribution</span>
+        <h3>Combined model</h3>
+        <p>Physical model provides the baseline prediction; an ANN learns and corrects its <strong>errors</strong>.</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:32px">All three were trained and tested separately on the measured laboratory data so their predictive accuracy could be compared head-to-head.</p>
+    <div class="pg">5</div>
+    <div class="notes">To make a fair comparison, the authors build all three models on the same measured data: physics alone, neural network alone, and the combined approach.</div>
+  </section>
+
+  <!-- 6. How the hybrid works -->
+  <section class="slide">
+    <div class="kicker">The key idea</div>
+    <h2>Let the ANN learn what physics gets wrong</h2>
+    <svg viewBox="0 0 1120 300" width="100%" style="margin-top:-10px" role="img" aria-label="Combined model flow: inputs feed the physical model and the ANN; the ANN predicts the residual, which is added to the physical prediction">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2d2d2c"/>
+        </marker>
+      </defs>
+      <g font-family="Work Sans, sans-serif">
+        <rect x="10" y="105" width="190" height="90" fill="#f2f2f2" stroke="#2d2d2c" stroke-width="2"/>
+        <text x="105" y="142" fill="#2d2d2c" font-size="19" font-weight="700" text-anchor="middle">Operating inputs</text>
+        <text x="105" y="168" fill="#5e5955" font-size="14" text-anchor="middle">temps, load, flows…</text>
+
+        <rect x="290" y="25" width="250" height="90" fill="#eef0f2" stroke="#636d77" stroke-width="2"/>
+        <rect x="290" y="25" width="8" height="90" fill="#636d77"/>
+        <text x="419" y="63" fill="#636d77" font-size="20" font-weight="700" text-anchor="middle">Physical model</text>
+        <text x="419" y="90" fill="#2d2d2c" font-size="15" text-anchor="middle">baseline  P_phys</text>
+
+        <rect x="290" y="185" width="250" height="90" fill="#f3f0ee" stroke="#80746c" stroke-width="2"/>
+        <rect x="290" y="185" width="8" height="90" fill="#80746c"/>
+        <text x="419" y="223" fill="#80746c" font-size="20" font-weight="700" text-anchor="middle">ANN</text>
+        <text x="419" y="250" fill="#2d2d2c" font-size="15" text-anchor="middle">predicted error  r̂</text>
+
+        <circle cx="660" cy="150" r="34" fill="#8f001a"/>
+        <text x="660" y="162" fill="#ffffff" font-size="34" font-weight="700" text-anchor="middle">+</text>
+
+        <rect x="780" y="105" width="320" height="90" fill="#8f001a"/>
+        <text x="940" y="142" fill="#ffffff" font-size="20" font-weight="700" text-anchor="middle">Combined prediction</text>
+        <text x="940" y="170" fill="#f6dfe4" font-size="15" text-anchor="middle">P = P_phys + r̂</text>
+
+        <path d="M200,135 C245,135 245,70 286,70" fill="none" stroke="#2d2d2c" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M200,165 C245,165 245,230 286,230" fill="none" stroke="#2d2d2c" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M540,70 C600,70 600,130 628,138" fill="none" stroke="#2d2d2c" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M540,230 C600,230 600,170 628,162" fill="none" stroke="#2d2d2c" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M694,150 L776,150" fill="none" stroke="#2d2d2c" stroke-width="2" marker-end="url(#ar)"/>
+      </g>
+    </svg>
+    <div class="grid2" style="margin-top:14px;gap:24px">
+      <div class="card" style="padding:18px 22px;border-left-color:var(--charcoal)">
+        <p style="font-size:17px"><strong class="accent">Training:</strong> run the physical model, compare with the metered power, and compute the residual
+          <span style="font-family:var(--mono)">r = P_meas − P_phys</span>. The ANN is trained to predict <em>r</em> from the operating inputs.</p>
+      </div>
+      <div class="card mix" style="padding:18px 22px">
+        <p style="font-size:17px"><strong class="accent">Prediction:</strong> no meter needed — the ANN estimates the error for new conditions and that correction is added to the physical model's output.</p>
+      </div>
+    </div>
+    <div class="pg">6</div>
+    <div class="notes">This is the heart of the paper. Physics gives a baseline. During training, we compare that baseline to what the meter actually measured; the difference is the residual. The neural network learns to predict that residual from the same inputs. When we later predict, we add the network's estimated error to the physics output. The physics guarantees sensible behavior; the network sharpens accuracy.</div>
+  </section>
+
+  <!-- 7. Results -->
+  <section class="slide">
+    <div class="kicker">Findings</div>
+    <h2>The combined model was generally the most accurate</h2>
+    <table class="cmp">
+      <thead><tr><th></th><th>Physical</th><th>Pure ANN</th><th class="hl">Combined</th></tr></thead>
+      <tbody>
+        <tr><td>Prediction accuracy</td>
+          <td><span class="rate"><i class="f"></i><i class="f"></i><i></i></span>Moderate</td>
+          <td><span class="rate"><i class="f"></i><i class="f"></i><i></i></span>Good in-sample</td>
+          <td class="hl"><span class="rate"><i class="f"></i><i class="f"></i><i class="f"></i></span><strong>Best overall</strong></td></tr>
+        <tr><td>Interpretability</td>
+          <td><span class="rate"><i class="f"></i><i class="f"></i><i class="f"></i></span>High</td>
+          <td><span class="rate"><i class="f"></i><i></i><i></i></span>Low</td>
+          <td class="hl"><span class="rate"><i class="f"></i><i class="f"></i><i class="f"></i></span>Physics backbone</td></tr>
+        <tr><td>Generalization</td>
+          <td><span class="rate"><i class="f"></i><i class="f"></i><i class="f"></i></span>Strong</td>
+          <td><span class="rate"><i class="f"></i><i></i><i></i></span>Limited by data</td>
+          <td class="hl"><span class="rate"><i class="f"></i><i class="f"></i><i class="f"></i></span>Anchored by physics</td></tr>
+        <tr><td>Data efficiency</td>
+          <td><span class="rate"><i class="f"></i><i class="f"></i><i class="f"></i></span>Needs little</td>
+          <td><span class="rate"><i class="f"></i><i></i><i></i></span>Needs a lot</td>
+          <td class="hl"><span class="rate"><i class="f"></i><i class="f"></i><i></i></span>Moderate</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:20px;font-size:16px">Qualitative summary of the authors' conclusions. See the paper's results section for the exact error metrics; the work cites ASHRAE Guideline 14, the standard benchmark for calibrated energy models.</p>
+    <div class="pg">7</div>
+    <div class="notes">Across the tests, the combined model generally gave the best accuracy. Importantly it keeps the interpretability of the physics model, because the network only nudges the physics output rather than replacing it.</div>
+  </section>
+
+  <!-- 8. Why it works -->
+  <section class="slide">
+    <div class="kicker">Interpretation</div>
+    <h2>Why the hybrid works</h2>
+    <div class="grid2" style="gap:44px">
+      <ul class="clean">
+        <li><strong>Easier learning task.</strong> The ANN learns a small correction, not the whole physics — so it needs less data.</li>
+        <li><strong>Prior knowledge built in.</strong> Thermodynamics constrains the output; the network can't wander far from physically plausible values.</li>
+        <li><strong>Division of labour.</strong> Physics ⇒ generalization. ANN ⇒ the nonlinear details physics simplifies away.</li>
+      </ul>
+      <div class="card" style="border-left-color:var(--charcoal)">
+        <span class="tag plain">How it relates</span>
+        <h3>Residual hybrid vs. PINNs</h3>
+        <p style="margin-bottom:12px">Physics-informed neural networks (PINNs) embed equations inside the network's loss function.</p>
+        <p>This paper instead uses a serial <span class="accent">"base + correction"</span> structure: simpler to build, and the physics model stays usable on its own.</p>
+      </div>
+    </div>
+    <div class="pg">8</div>
+    <div class="notes">Why does this help? Learning a small correction is much easier than learning the whole system from scratch. And because the physics is always in the loop, predictions stay physically sensible. This differs from physics-informed neural networks, which bake equations into training; here the two models stay separate and are simply added together.</div>
+  </section>
+
+  <!-- 9. Limitations -->
+  <section class="slide">
+    <div class="kicker">Critical view</div>
+    <h2>Limitations to keep in mind</h2>
+    <ul class="clean">
+      <li><strong>Single laboratory system.</strong> Results come from one integrated heat pipe rig; performance in a full-scale, commercial data center is untested.</li>
+      <li><strong>Random train/test split.</strong> The authors note the data was split randomly. For time-series operation data, a chronological split is a tougher, more realistic test.</li>
+      <li><strong>Physics still required.</strong> A reasonable physical model must exist first; the hybrid inherits any structural errors the ANN can't learn.</li>
+      <li><strong>Correction is data-bound.</strong> Outside the training range, the ANN's error estimate may be unreliable — though the physics baseline limits the damage.</li>
+    </ul>
+    <div class="pg">9</div>
+    <div class="notes">A few caveats. It is one lab system. The random split may make results look better than they would on genuinely future data. And you still need to build a physics model first, which is the time-consuming part the paper hopes to ease.</div>
+  </section>
+
+  <!-- 10. Takeaways -->
+  <section class="slide hero">
+    <div class="kicker">Conclusion</div>
+    <h2 style="color:#fff">Takeaways</h2>
+    <div class="grid3">
+      <div class="card">
+        <h3>1 · Don't choose — combine</h3>
+        <p>Physics and AI are complementary: one brings understanding, the other brings flexibility.</p>
+      </div>
+      <div class="card">
+        <h3>2 · Learn the error</h3>
+        <p>Training an ANN on the physics model's residual gave the best overall accuracy while keeping interpretability.</p>
+      </div>
+      <div class="card">
+        <h3>3 · Toward smarter control</h3>
+        <p>Trustworthy, accurate predictions are a building block for digital twins and energy-optimal cooling control.</p>
+      </div>
+    </div>
+    <p style="margin-top:36px;font-family:var(--serif);font-style:italic;font-size:25px;color:#fff;max-width:1000px">Embedding prior physical knowledge into machine learning is a practical path to models engineers can both trust and rely on.</p>
+    <div class="notes">Three takeaways: combine physics with AI instead of choosing; let the network learn the physics model's mistakes; and use these trustworthy predictions for better control of data center cooling.</div>
+  </section>
+
+  <!-- 11. References -->
+  <section class="slide">
+    <div class="kicker">References</div>
+    <h2>Sources</h2>
+    <ol class="refs" style="padding-left:22px">
+      <li><strong>Li, X., Wang, X., He, Z., Chen, X., &amp; Li, Z. (2024).</strong> Combining physical laws and ANN for predicting energy consumption of data center cooling systems. <em>Energy and Buildings</em>, 311, 114170. <a href="https://doi.org/10.1016/j.enbuild.2024.114170">https://doi.org/10.1016/j.enbuild.2024.114170</a></li>
+      <li><strong>He, Z., et al. (2021).</strong> Energy efficiency optimization of an integrated heat pipe cooling system in data center based on genetic algorithm. <em>Applied Thermal Engineering</em>, 182, 115800. <a href="https://doi.org/10.1016/j.applthermaleng.2020.115800">https://doi.org/10.1016/j.applthermaleng.2020.115800</a></li>
+      <li><strong>Raissi, M., Perdikaris, P., &amp; Karniadakis, G. E. (2019).</strong> Physics-informed neural networks. <em>Journal of Computational Physics</em>, 378, 686–707. <a href="https://doi.org/10.1016/j.jcp.2018.10.045">https://doi.org/10.1016/j.jcp.2018.10.045</a></li>
+      <li><strong>Prediction of Overall Energy Consumption of Data Centers in Different Locations (2022)</strong> — source for the ~40% cooling share estimate. <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9145178/">https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9145178/</a></li>
+    </ol>
+    <div class="pg">11</div>
+    <div class="notes">Full citation of the paper and the supporting sources used in this presentation.</div>
+  </section>
+
+</div>
+
+<div id="nav"><div id="prevZone" aria-label="Previous slide"></div><div id="nextZone" aria-label="Next slide"></div></div>
+<div id="notes"><b>Speaker notes</b><span id="notesText"></span></div>
+<div id="counter"></div>
+<div id="hint">← → or tap to navigate · N notes · F fullscreen</div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var stage = document.getElementById('stage');
+  var counter = document.getElementById('counter');
+  var progress = document.getElementById('progress');
+  var notesBox = document.getElementById('notes');
+  var notesText = document.getElementById('notesText');
+  var hint = document.getElementById('hint');
+  var i = 0;
+
+  function fit(){
+    var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    stage.style.transform = 'scale(' + s + ')';
+  }
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function(s, k){ s.classList.toggle('active', k === i); });
+    counter.textContent = (i + 1) + ' / ' + slides.length;
+    progress.style.width = ((i + 1) / slides.length * 100) + '%';
+    var nt = slides[i].querySelector('.notes');
+    notesText.textContent = nt ? nt.textContent : '';
+    if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+  }
+
+  function next(){ show(i + 1); }
+  function prev(){ show(i - 1); }
+
+  document.addEventListener('keydown', function(e){
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ' || k === 'Enter') { e.preventDefault(); next(); }
+    else if (k === 'ArrowLeft' || k === 'PageUp' || k === 'Backspace') { e.preventDefault(); prev(); }
+    else if (k === 'Home') show(0);
+    else if (k === 'End') show(slides.length - 1);
+    else if (k === 'n' || k === 'N') notesBox.classList.toggle('show');
+    else if (k === 'f' || k === 'F') {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+      else if (document.exitFullscreen) document.exitFullscreen();
+    }
+  });
+
+  document.getElementById('nextZone').addEventListener('click', next);
+  document.getElementById('prevZone').addEventListener('click', prev);
+
+  var tx = null;
+  document.addEventListener('touchstart', function(e){ tx = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', function(e){
+    if (tx === null) return;
+    var dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); }
+    tx = null;
+  }, {passive:true});
+
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', function(){
+    var h = parseInt(location.hash.slice(1), 10);
+    if (!isNaN(h) && h - 1 !== i) show(h - 1);
+  });
+
+  setTimeout(function(){ hint.style.opacity = 0; }, 6000);
+
+  fit();
+  var start = parseInt(location.hash.slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>
